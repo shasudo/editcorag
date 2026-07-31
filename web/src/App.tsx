@@ -1,14 +1,18 @@
 import { useCallback, useEffect, useState } from "react";
-import type { Citation } from "./api";
+import type { Citation, Health } from "./api";
 import { api } from "./api";
 import { Chat } from "./components/Chat";
 import { DocumentList } from "./components/DocumentList";
 import { PdfViewer } from "./components/PdfViewer";
+import { ApiKeyForm, Modal, ModelDownload, SettingsPanel } from "./components/Setup";
+import { GearIcon } from "./components/icons";
 
 export function App() {
   const [selectedDocs, setSelectedDocs] = useState<number[]>([]);
   const [citation, setCitation] = useState<Citation | null>(null);
-  const [info, setInfo] = useState<Record<string, unknown> | null>(null);
+  const [info, setInfo] = useState<Health | null>(null);
+  const [showSettings, setShowSettings] = useState(false);
+  const [keyPromptDismissed, setKeyPromptDismissed] = useState(false);
 
   const refreshInfo = useCallback(() => {
     api
@@ -19,6 +23,17 @@ export function App() {
 
   useEffect(refreshInfo, [refreshInfo]);
 
+  // Keep polling while anything is still missing, so the key prompt and the
+  // download banner clear themselves without the user reloading.
+  useEffect(() => {
+    if (info?.ready) return;
+    const t = setInterval(refreshInfo, 4000);
+    return () => clearInterval(t);
+  }, [info?.ready, refreshInfo]);
+
+  const needsKey = info != null && info.llm?.status !== "ready";
+  const needsModels = info != null && !info.models?.ready;
+
   const toggleDoc = (id: number) =>
     setSelectedDocs((prev) =>
       prev.includes(id) ? prev.filter((d) => d !== id) : [...prev, id],
@@ -26,7 +41,7 @@ export function App() {
 
   // Answering always runs on Groq, so the header states the split plainly
   // rather than guessing at it from the model id.
-  const model = typeof info?.llm_model === "string" ? info.llm_model : "";
+  const model = info?.llm_model ?? "";
 
   return (
     <div className="flex h-full flex-col bg-[var(--bg)] text-[var(--text)]">
@@ -67,7 +82,20 @@ export function App() {
             </span>
           </div>
         )}
+        <button
+          type="button"
+          onClick={() => setShowSettings(true)}
+          aria-label="Settings"
+          title="Settings"
+          className={`rounded-md p-1.5 text-[var(--text-3)] transition hover:bg-[var(--surface-2)] hover:text-[var(--text)] ${
+            info ? "" : "ml-auto"
+          } ${needsKey ? "text-[var(--warn)]" : ""}`}
+        >
+          <GearIcon className="h-4 w-4" />
+        </button>
       </header>
+
+      {needsModels && <ModelDownload onDone={refreshInfo} />}
 
       <div className="flex min-h-0 flex-1">
         <aside className="w-64 shrink-0 border-r border-[var(--line)] bg-[var(--surface)]">
@@ -90,6 +118,23 @@ export function App() {
           <PdfViewer citation={citation} />
         </section>
       </div>
+
+      {/* Asked for in place on the home screen, not behind a setup wizard.
+          Dismissable: documents can be added before a key exists, only
+          answering needs one. */}
+      {needsKey && !keyPromptDismissed && !showSettings && (
+        <Modal title="One quick step" onClose={() => setKeyPromptDismissed(true)}>
+          <ApiKeyForm status={info?.llm?.status} onSaved={refreshInfo} />
+        </Modal>
+      )}
+
+      {showSettings && (
+        <SettingsPanel
+          health={info}
+          onClose={() => setShowSettings(false)}
+          onChanged={refreshInfo}
+        />
+      )}
     </div>
   );
 }

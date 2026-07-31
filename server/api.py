@@ -50,9 +50,14 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     this one is never reused - but it creates the schema before the first
     request, rather than leaving several handler threads to race on it.
     """
+    from . import setup as provisioning
+
     cfg = get_settings()
     configure_logging(cfg.log_level, cfg.log_json)
     cfg.ensure_dirs()
+    # Re-apply a key saved by an earlier session before anything reads settings.
+    provisioning.load_api_key(cfg)
+    cfg = get_settings()
     db.get_conn(cfg.sqlite_path)
     log.info("api ready", data_dir=str(cfg.data_dir), model=cfg.llm_model)
     yield
@@ -190,11 +195,10 @@ async def set_llm_key(payload: ApiKey) -> dict[str, Any]:
     settings cache and the status cache are both dropped so the very next poll
     reflects the new key instead of a stale rejection.
     """
-    from .llm.models import invalidate_status, llm_status
+    from . import setup as provisioning
+    from .llm.models import llm_status
 
-    os.environ["GROQ_API_KEY"] = payload.key.strip()
-    get_settings.cache_clear()
-    invalidate_status()
+    provisioning.save_api_key(payload.key.strip())
     return llm_status(get_settings())
 
 

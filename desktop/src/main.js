@@ -2,35 +2,8 @@
 
 const { app, BrowserWindow, dialog, ipcMain, shell, Menu } = require("electron");
 const path = require("node:path");
-const fs = require("node:fs");
 const http = require("node:http");
 const { Backend } = require("./backend");
-
-/**
- * The API key lives beside the user's data, not in the app bundle, and is the
- * one secret this app holds. Storing it per-install rather than compiling it in
- * means a shared build cannot leak one person's Groq quota to everyone else.
- */
-function keyFile() {
-  return path.join(app.getPath("userData"), "credentials.json");
-}
-
-function loadKey() {
-  try {
-    return JSON.parse(fs.readFileSync(keyFile(), "utf8")).groqApiKey || "";
-  } catch {
-    return "";
-  }
-}
-
-function saveKeyToDisk(key) {
-  try {
-    fs.mkdirSync(path.dirname(keyFile()), { recursive: true });
-    fs.writeFileSync(keyFile(), JSON.stringify({ groqApiKey: key }), { mode: 0o600 });
-  } catch (err) {
-    console.error("could not persist the API key:", err.message);
-  }
-}
 
 let backend;
 let setupWindow = null;
@@ -98,52 +71,6 @@ function createMainWindow(url) {
   return mainWindow;
 }
 
-/**
- * Consume one of the provisioning SSE streams, forwarding progress.
- *
- * `label` is what the user sees; the two streams differ only in which model
- * they are fetching.
- */
-function streamSetup(pathname, label) {
-  return new Promise((resolve, reject) => {
-    const req = http.get(`${backend.origin}${pathname}`, (res) => {
-      let buffer = "";
-      res.on("data", (chunk) => {
-        buffer += chunk.toString();
-        let split;
-        while ((split = buffer.indexOf("\n\n")) !== -1) {
-          const frame = buffer.slice(0, split);
-          buffer = buffer.slice(split + 2);
-          const data = frame
-            .split(/\r?\n/)
-            .filter((l) => l.startsWith("data:"))
-            .map((l) => l.slice(5).trim())
-            .join("");
-          if (!data) continue;
-          let event;
-          try {
-            event = JSON.parse(data);
-          } catch {
-            continue;
-          }
-          if (event.stage === "error") return reject(new Error(event.detail));
-          if (event.stage === "download") {
-            const gb = event.total_bytes
-              ? `${(event.done_bytes / 1e9).toFixed(2)} of ${(event.total_bytes / 1e9).toFixed(2)} GB`
-              : event.detail || label;
-            report({ phase: "downloading", percent: event.percent, detail: gb });
-          } else if (event.stage === "start") {
-            report({ phase: "downloading", percent: 0, detail: label });
-          }
-        }
-      });
-      res.on("end", resolve);
-      res.on("error", reject);
-    });
-    req.on("error", reject);
-  });
-}
-
 async function boot() {
   createSetupWindow();
   report({ phase: "starting", detail: "Starting the engine" });
@@ -160,63 +87,12 @@ async function boot() {
   };
 
   report({ phase: "starting", detail: "Waiting for the engine" });
-  let health = await backend.waitForHealth();
+  await backend.waitForHealth();
 
-  if (!health.models?.ready) {
-    report({
-      phase: "downloading",
-      percent: 0,
-      detail: "First run: downloading the language models (about 7 GB)",
-    });
-    await streamSetup("/api/setup/stream", "Downloading the search models");
-    health = await backend.health();
-  }
-
-  if (health.llm?.status !== "ready") {
-    report({ phase: "llm", llm: health.llm });
-    return; // the window waits for the user to fix it or continue anyway
-  }
-
+  // Straight to the home screen. Model downloads and the API key are asked for
+  // in place, inside the app, so the only thing this splash covers is the few
+  // seconds before the server can serve a page at all.
   createMainWindow(backend.origin);
-}
-
-async function retryLlm() {
-  const health = await backend.health();
-  if (health.llm?.status === "ready") createMainWindow(backend.origin);
-  else report({ phase: "llm", llm: health.llm });
-  return health.llm;
-}
-
-/** Hand a Groq key to the running backend, keep it if it works, then continue. */
-async function submitKey(key) {
-  const status = await new Promise((resolve, reject) => {
-    const body = JSON.stringify({ key });
-    const req = http.request(
-      `${backend.origin}/api/setup/llm-key`,
-      { method: "POST", headers: { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(body) } },
-      (res) => {
-        let out = "";
-        res.on("data", (c) => (out += c));
-        res.on("end", () => {
-          try {
-            resolve(JSON.parse(out));
-          } catch (err) {
-            reject(err);
-          }
-        });
-      },
-    );
-    req.on("error", reject);
-    req.end(body);
-  });
-
-  if (status.status === "ready") {
-    saveKeyToDisk(key);
-    createMainWindow(backend.origin);
-  } else {
-    report({ phase: "llm", llm: status });
-  }
-  return status;
 }
 
 // A second launch should surface the window that already exists, not start a
@@ -235,7 +111,6 @@ if (!app.requestSingleInstanceLock()) {
   app.whenReady().then(() => {
     backend = new Backend({
       dataDir: app.getPath("userData"),
-      apiKey: loadKey(),
       // Mirrored to the terminal so `npm start` shows engine output, and so a
       // packaged run leaves something in the system log to diagnose from.
       onLog: (line) => console.log("[engine]", line),
@@ -243,9 +118,6 @@ if (!app.requestSingleInstanceLock()) {
     if (isMac) Menu.setApplicationMenu(Menu.buildFromTemplate([{ role: "appMenu" }, { role: "editMenu" }, { role: "windowMenu" }]));
     else Menu.setApplicationMenu(null);
 
-    ipcMain.handle("retry-llm", retryLlm);
-    ipcMain.handle("submit-key", (_e, key) => submitKey(key));
-    ipcMain.handle("continue-anyway", () => createMainWindow(backend.origin));
     ipcMain.handle("open-external", (_e, url) => shell.openExternal(url));
     ipcMain.handle("get-logs", () => backend.log.slice(-200).join("\n"));
 

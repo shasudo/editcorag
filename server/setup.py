@@ -28,6 +28,61 @@ _DONE = object()
 _POLL_S = 0.5
 
 
+def _config_file(cfg: Settings) -> Path:
+    return cfg.data_dir / "config.json"
+
+
+def save_api_key(key: str, cfg: Settings | None = None) -> None:
+    """Persist the Groq key beside the user's data, and apply it immediately.
+
+    Stored by the server rather than the desktop shell so the key survives a
+    restart the same way whether the app was launched from the shell or with
+    `editcorag serve`. It lands in data_dir, which is always writable - a
+    packaged app's own directory is not.
+    """
+    import json
+    import os
+
+    from .llm.models import invalidate_status
+
+    cfg = cfg or get_settings()
+    cfg.data_dir.mkdir(parents=True, exist_ok=True)
+    path = _config_file(cfg)
+    path.write_text(json.dumps({"groq_api_key": key}), encoding="utf-8")
+    try:
+        path.chmod(0o600)
+    except OSError:
+        pass  # Windows has no POSIX mode; the write itself still stands
+
+    os.environ["GROQ_API_KEY"] = key
+    get_settings.cache_clear()
+    invalidate_status()
+
+
+def load_api_key(cfg: Settings | None = None) -> bool:
+    """Apply a previously saved key, unless the environment already set one.
+
+    Called once at start-up. An explicit environment variable wins, so a
+    developer running with GROQ_API_KEY set is never overridden by whatever a
+    previous desktop session happened to save.
+    """
+    import json
+    import os
+
+    if os.environ.get("GROQ_API_KEY"):
+        return True
+    cfg = cfg or get_settings()
+    try:
+        key = json.loads(_config_file(cfg).read_text(encoding="utf-8")).get("groq_api_key")
+    except Exception:  # noqa: BLE001 - absent or unreadable simply means "not set up yet"
+        return False
+    if not key:
+        return False
+    os.environ["GROQ_API_KEY"] = key
+    get_settings.cache_clear()
+    return True
+
+
 def required_models(cfg: Settings | None = None) -> list[tuple[str, str]]:
     """(role, repo_id) for every model the app cannot run without."""
     cfg = cfg or get_settings()
