@@ -12,11 +12,11 @@
     "dist:win": "npm run bundle && electron-builder --win"
   },
   "devDependencies": {
-    "electron": "^33.2.0",
+    "electron": "^38.8.6",
     "electron-builder": "^25.1.8"
   },
   "allowScripts": {
-    "electron@33.4.11": true
+    "electron@38.8.6": true
   },
   "build": {
     "appId": "com.editcorag.desktop",
