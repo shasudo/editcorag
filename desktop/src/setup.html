@@ -74,20 +74,6 @@
     <h1 id="title">Starting EditcoRAG</h1>
     <p id="detail">Getting things ready…</p>
 
-    <div id="progress" class="hidden">
-      <div class="bar"><div id="fill"></div></div>
-      <p class="muted" id="pct" style="margin-top:9px">0%</p>
-    </div>
-
-    <div id="hint" class="hidden">
-      <p class="muted">This happens once. You can leave it running.</p>
-    </div>
-
-    <div id="keyrow" class="hidden">
-      <input id="key" type="password" spellcheck="false" autocomplete="off"
-             placeholder="gsk_…" aria-label="Groq API key" />
-    </div>
-
     <div id="actions" class="row hidden"></div>
     <pre id="logs" class="hidden"></pre>
 
@@ -108,84 +94,14 @@
         show(box, buttons.length > 0);
       }
 
-      const LLM_HELP = {
-        no_key: {
-          title: "One quick step",
-          body: "EditcoRAG writes answers using Groq. Paste a Groq API key below — it’s free to create and is stored only on this computer.",
-          needsKey: true,
-        },
-        bad_key: {
-          title: "That key wasn’t accepted",
-          body: "Groq rejected the key. Check it was copied in full, then try again.",
-          needsKey: true,
-        },
-        offline: {
-          title: "No connection to Groq",
-          body: "EditcoRAG couldn’t reach Groq. Check this computer’s internet connection, then choose Try again.",
-          needsKey: false,
-        },
-        model_missing: {
-          title: "That model isn’t available",
-          body: "Groq doesn’t currently serve the configured model. You can continue — answering will not work until it is changed.",
-          needsKey: false,
-        },
-        unknown: {
-          title: "Couldn’t check the answering model",
-          body: "EditcoRAG could not verify Groq. You can continue and try asking a question.",
-          needsKey: false,
-        },
-      };
-
       window.shellApi.onStatus((s) => {
-        show($("progress"), s.phase === "downloading");
-        show($("hint"), s.phase === "downloading");
-        show($("spinner"), s.phase === "starting" || s.phase === "downloading");
+        show($("spinner"), s.phase === "starting");
         show($("logs"), false);
-        show($("keyrow"), false);
         setActions([]);
 
         if (s.phase === "starting") {
           $("title").textContent = "Starting EditcoRAG";
           $("detail").textContent = s.detail || "";
-        } else if (s.phase === "downloading") {
-          $("title").textContent = "Setting up";
-          $("detail").textContent = s.detail || "Downloading language models";
-          $("fill").style.width = (s.percent || 0) + "%";
-          $("pct").textContent = Math.round(s.percent || 0) + "%";
-        } else if (s.phase === "llm") {
-          const help = LLM_HELP[s.llm?.status] || LLM_HELP.unknown;
-          $("title").textContent = help.title;
-          $("detail").textContent = help.body;
-          show($("keyrow"), help.needsKey);
-
-          if (help.needsKey) {
-            const field = $("key");
-            const submit = async () => {
-              const value = field.value.trim();
-              if (!value) return;
-              $("detail").textContent = "Checking the key…";
-              setActions([]);
-              await window.shellApi.submitKey(value);
-            };
-            field.onkeydown = (e) => {
-              if (e.key === "Enter") submit();
-            };
-            setTimeout(() => field.focus(), 50);
-            setActions([
-              { label: "Continue", primary: true, onClick: submit },
-              { label: "Get a free key", onClick: () =>
-                  window.shellApi.openExternal("https://console.groq.com/keys") },
-            ]);
-          } else {
-            setActions([
-              { label: "Try again", primary: true, onClick: async (e) => {
-                  e.target.textContent = "Checking…";
-                  e.target.disabled = true;
-                  await window.shellApi.retryLlm();
-                } },
-              { label: "Continue anyway", onClick: () => window.shellApi.continueAnyway() },
-            ]);
-          }
         } else if (s.phase === "error") {
           $("title").textContent = "EditcoRAG couldn’t start";
           $("detail").textContent = s.detail || "Something went wrong.";

@@ -46,13 +46,39 @@ export type FinalAnswer = {
   thread_id: string;
 };
 
+export type LlmStatus = {
+  status: "ready" | "no_key" | "bad_key" | "offline" | "model_missing";
+  detail?: string;
+  model?: string;
+};
+
+export type Health = {
+  ok: boolean;
+  ready: boolean;
+  documents: number;
+  chunks: number;
+  index_error: string | null;
+  llm: LlmStatus;
+  models: { ready: boolean; models: { role: string; repo: string; cached: boolean }[] };
+  llm_model: string;
+  embed_model: string;
+  answer_mode: string;
+  graders_enabled: boolean;
+};
+
 const json = async <T,>(res: Response): Promise<T> => {
   if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
   return res.json() as Promise<T>;
 };
 
 export const api = {
-  health: () => fetch("/api/health").then(json<Record<string, unknown>>),
+  health: () => fetch("/api/health").then(json<Health>),
+  saveApiKey: (key: string) =>
+    fetch("/api/setup/llm-key", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ key }),
+    }).then(json<LlmStatus>),
   documents: () => fetch("/api/documents").then(json<DocumentInfo[]>),
   remove: (id: number) =>
     fetch(`/api/documents/${id}`, { method: "DELETE" }).then(json<unknown>),
@@ -81,12 +107,15 @@ export async function streamSSE(
   handlers: {
     onEvent: (event: string, data: unknown) => void;
     signal?: AbortSignal;
+    method?: "GET" | "POST";
   },
 ): Promise<void> {
+  const method = handlers.method ?? "POST";
   const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+    method,
+    ...(method === "POST"
+      ? { headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }
+      : {}),
     signal: handlers.signal,
   });
   if (!res.ok || !res.body) throw new Error(`stream failed: ${res.status}`);
