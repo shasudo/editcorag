@@ -63,10 +63,13 @@ jobs:
           pnpm install --frozen-lockfile
           pnpm build
 
+      # working-directory, not `npm --prefix`: on Windows the prefix flag still
+      # resolves package.json from the current directory and fails with ENOENT.
       - name: Build the desktop app
+        working-directory: desktop
         run: |
-          npm --prefix desktop install
-          npm --prefix desktop run ${{ matrix.target }}
+          npm install
+          npm run ${{ matrix.target }}
 
       - uses: actions/upload-artifact@v4
         with:
