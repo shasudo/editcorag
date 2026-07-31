@@ -71,6 +71,42 @@ jobs:
           npm install
           npm run ${{ matrix.target }}
 
+      # A green build only proves the installer was produced. This starts the
+      # bundled engine and waits for it to serve, which is what actually
+      # catches a runtime that cannot resolve its own stdlib or a native wheel
+      # that is missing on this platform - neither of which is visible until
+      # someone launches the app.
+      - name: Smoke-test the bundled engine
+        shell: bash
+        working-directory: desktop
+        run: |
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            PY="resources/python/python.exe"
+          else
+            PY="resources/python/bin/python3"
+          fi
+          export PYTHONHOME="$PWD/resources/python"
+          export LOCALRAG_DATA_DIR="$PWD/smoke-data"
+          export LOCALRAG_WEB_DIST="$PWD/resources/app/web/dist"
+          "$PY" -m server.cli serve --port 0 > smoke.log 2>&1 &
+          for _ in $(seq 1 120); do
+            grep -q LOCALRAG_READY smoke.log && break
+            sleep 2
+          done
+          grep -q LOCALRAG_READY smoke.log || { echo "engine never started:"; cat smoke.log; exit 1; }
+          PORT=$(grep -o 'LOCALRAG_READY {.*}' smoke.log | head -1 | sed 's/.*"port": *\([0-9]*\).*/\1/')
+          echo "engine announced port $PORT"
+          for _ in $(seq 1 60); do
+            curl -sf "http://127.0.0.1:$PORT/api/health" -o health.json && break
+            sleep 2
+          done
+          test -s health.json || { echo "never became reachable:"; cat smoke.log; exit 1; }
+          cat health.json
+          grep -q '"ok": *true' health.json || { echo "health did not report ok"; exit 1; }
+          curl -sf "http://127.0.0.1:$PORT/" | grep -q 'id="root"' \
+            || { echo "the bundled UI was not served"; exit 1; }
+          echo "engine starts, serves the API and the UI on $RUNNER_OS"
+
       - uses: actions/upload-artifact@v4
         with:
           name: editcorag-${{ matrix.artifact }}
