@@ -1,0 +1,98 @@
+[project]
+name = "editcorag"
+version = "0.1.0"
+description = "Ask questions about large PDFs. Documents and search stay local; answers by Groq."
+authors = [{ name = "Editco Media" }]
+readme = "README.md"
+# <3.14 is deliberate: docling gates onnxruntime (the RapidOCR backend) on
+# python_version < "3.14", so on 3.14 OCR would silently lose its runtime.
+requires-python = ">=3.12,<3.14"
+
+dependencies = [
+    # --- orchestration / LLM ---------------------------------------------
+    "langchain>=1.3.14",
+    "langchain-core>=1.5.2",
+    # v1 home of EnsembleRetriever / ContextualCompressionRetriever.
+    # NB: langchain-community is deliberately absent - upstream has declared it
+    # sunset, and its CrossEncoderReranker discards rerank scores, which the
+    # abstention threshold needs. We subclass langchain-core's
+    # BaseDocumentCompressor over sentence-transformers instead.
+    "langchain-classic>=1.0.8",
+    "langgraph>=1.2.10",
+    "langgraph-checkpoint-sqlite>=3.1.0",
+    # AsyncSqliteSaver (used by the streaming API) requires this; SqliteSaver
+    # is sync-only and raises under graph.astream().
+    "aiosqlite>=0.20",
+    # Groq speaks the OpenAI wire protocol, so this is the only chat client.
+    "langchain-openai>=1.4.1",
+    "langchain-huggingface>=1.2.2",
+    # --- parsing / OCR ----------------------------------------------------
+    # RapidOCR only: portable ONNX, no system binary, and identical output on
+    # Windows and macOS. Platform-specific backends read the same scan
+    # differently, which is not a trade this project is willing to make.
+    "docling[rapidocr]>=2.116.0",
+    "pymupdf>=1.28.0",
+    # --- storage ----------------------------------------------------------
+    "lancedb>=0.36.0",
+    # --- models -----------------------------------------------------------
+    "sentence-transformers>=5.6.1",
+    # --- service / tooling ------------------------------------------------
+    "fastapi>=0.141.1",
+    "uvicorn[standard]>=0.52.0",
+    # <3.4 comes from dev-only langgraph-api; pin our own floor for the
+    # EventSourceResponse API we import directly.
+    "sse-starlette>=2.1.3",
+    "python-multipart>=0.0.20",
+    "pydantic-settings>=2.14.2",
+    "typer>=0.15.0",  # upper bound left to docling-core, which pins typer<0.25
+    "rich>=15.0.0",
+    "structlog>=24.1.0",  # <26 comes from dev-only langgraph-api
+    "rapidfuzz>=3.14.5",
+    "pyyaml>=6.0.3",
+    # --- imported directly, so declared rather than relied on transitively ---
+    "httpx>=0.27",
+    "pyarrow>=21",
+    "docling-core>=2.88",
+    "numpy>=2.0",
+    "huggingface-hub>=1.0",
+    "torch>=2.2.2",
+]
+
+[project.urls]
+Homepage = "https://editcomedia.com"
+Repository = "https://github.com/shasudo/editcorag"
+
+[dependency-groups]
+# A group, not an extra, so a plain `uv sync` installs it.
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.9",
+    "langgraph-cli[inmem]>=0.4",  # `langgraph dev` + Studio graph debugging
+]
+
+[project.scripts]
+editcorag = "server.cli:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["server"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+# The desktop bundle contains a whole copied CPython plus every dependency.
+# Linting it is meaningless and drowns real findings; respect-gitignore cannot
+# help here because this tree is not always a git checkout.
+extend-exclude = ["desktop/resources", "desktop/release", "web"]
+
+[tool.ruff.lint]
+# BLE and SLF are selected so the `# noqa: BLE001` / `SLF001` directives in the
+# codebase actually suppress something; RUF100 then catches any that go stale.
+select = ["E", "F", "I", "UP", "B", "BLE", "SLF", "RUF100"]
+ignore = ["B008"]  # typer uses function calls in argument defaults by design
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

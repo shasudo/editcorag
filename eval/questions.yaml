@@ -1,0 +1,100 @@
+# Evaluation set for the indexed corpus (FCIC report + FDIC chapter).
+#
+# Every gold page here was verified against the live index: the answering
+# sentence was located on the page claimed. Questions are deliberately
+# paraphrased rather than lifted from the report - a question that reuses the
+# source wording is matched by BM25 alone and measures nothing.
+
+questions:
+  - question: "Around 2005, how common were mortgages where the borrower paid nothing toward the loan balance at first?"
+    pages: [24]
+    answer_contains: ["one-quarter", "2005"]
+    tags: [mortgage-products, numeric, single-hop]
+
+  - question: "A Citigroup manager whose team spot-checked home loans headed to Fannie and Freddie found how many of them were bad?"
+    pages: [197]
+    answer_contains: ["40 to 60 percent", "2006"]
+    tags: [numeric, underwriting-quality, whistleblower]
+
+  - question: "When someone at AIG went back and checked what was really inside the bundles the firm had promised to cover, how far off was the number they'd been given?"
+    pages: [229]
+    answer_contains: ["less than 10%", "80 or 90%"]
+    tags: [numeric, aig, credit-default-swaps]
+
+  - question: "While AIG and Goldman were arguing over a much larger margin demand, how much cash did AIG actually hand over as a first payment?"
+    pages: [297]
+    answer_contains: ["$450 million"]
+    tags: [aig, goldman, numeric]
+
+  - question: "Which American bank was sitting on the biggest pile of over-the-counter derivatives in mid-2008, and how much did it hold?"
+    pages: [329]
+    answer_contains: ["JP Morgan", "94.5 trillion"]
+    tags: [derivatives, banks, numeric]
+
+  - question: "What was Henry Paulson's private opinion of Fannie Mae and Freddie Mac when he first arrived at Treasury?"
+    pages: [338]
+    tags: [gses, paulson, quote]
+
+  - question: "When Washington agreed to backstop a walled-off pool of Citigroup's bad assets, how much of the losses did the bank itself have to eat first, and what share did the government cover beyond that?"
+    pages: [410]
+    answer_contains: ["39.5 billion", "90"]
+    tags: [numeric, bailout, loss-sharing]
+
+  - question: "Once the Fed began lending directly into the short-term corporate borrowing market in late 2008, did banks stop making it harder to borrow?"
+    pages: [424]
+    answer_contains: ["70", "fourth quarter"]
+    tags: [numeric, credit-crunch, fed-programs]
+
+  - question: "Right before things fell apart, how were the shakiest home loans split up between whoever the taxpayer stood behind and ordinary private buyers?"
+    pages: [484]
+    answer_contains: ["19.2 million", "7.8 million"]
+    tags: [numeric, dissent, gse]
+
+  - question: "How far off were the loss forecasts made by Lehman's people for the 2006 crop of weak mortgages compared with what was figured out years afterward?"
+    pages: [495]
+    answer_contains: ["19 percent", "38 percent"]
+    tags: [numeric, comparison, loss-estimates]
+
+  - question: "When did the neighborhood-lending law aimed at banks first pass, and did it cover every kind of mortgage lender?"
+    pages: [553]
+    answer_contains: ["1977"]
+    tags: [date, regulation, scope]
+
+  - question: "After the old watchdog over Fannie and Freddie was scrapped, which body took over the job and what law set it up?"
+    pages: [569]
+    answer_contains: ["2008"]
+    tags: [definition, gse, entity]
+
+  - question: "Who showed up to speak for Lehman at the inquiry's panel on that firm, and who came from JPMorgan?"
+    pages: [578]
+    answer_contains: ["Fuld", "Zubrow"]
+    tags: [entity, people, lehman]
+
+  - question: "Who was running the futures regulator when it went before House lawmakers about swaps trading in 1998, and when exactly did that happen?"
+    pages: [589]
+    answer_contains: ["Brooksley Born", "July 24, 1998"]
+    tags: [people, date, derivatives]
+
+  - question: "When Silicon Valley Bank failed in March 2023, how much did the FDIC's Deposit Insurance Fund lose, and did regulators invoke the systemic risk exception for its uninsured depositors?"
+    should_abstain: true
+    tags: [negative, out-of-period-event, fdic]
+
+  - question: "How large was JPMorgan's loss on the London Whale synthetic credit portfolio, and did the report attribute it to the same OTC derivatives gaps it identified earlier?"
+    should_abstain: true
+    tags: [negative, out-of-period-event, derivatives]
+
+  - question: "What was the total dollar amount of TARP capital ultimately disbursed to U.S. banks, and how much of it had been repaid to Treasury?"
+    should_abstain: true
+    tags: [negative, unstated-statistic, tarp]
+
+  - question: "What was Lehman Brothers' leverage ratio at the end of its second fiscal quarter of 2008, just before the bankruptcy filing?"
+    should_abstain: true
+    tags: [negative, unstated-statistic, lehman]
+
+  - question: "What did the Commission conclude about the September 2007 depositor run on Northern Rock and the Bank of England's handling of it?"
+    should_abstain: true
+    tags: [negative, institution-not-analyzed, foreign-institution]
+
+  - question: "Does the report predict whether the Dodd-Frank Act's orderly liquidation authority will prevent future too-big-to-fail bailouts?"
+    should_abstain: true
+    tags: [negative, forward-looking, too-big-to-fail]
