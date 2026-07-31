@@ -46,14 +46,23 @@ function uv() {
 
 function standaloneRuntime(uvBin) {
   const found = execFileSync(uvBin, ["python", "find", "3.12"], { encoding: "utf8" }).trim();
-  // `uv python find` may report a venv's shim; follow it to the real install,
-  // then walk up out of bin/ to the runtime root.
-  const real = realpathSync(found);
-  const root = path.dirname(path.dirname(real));
-  if (!existsSync(path.join(root, "lib")) && !existsSync(path.join(root, "Lib"))) {
-    throw new Error(`expected a standalone runtime at ${root}`);
+  // `uv python find` may report a venv shim, so follow it to the real binary.
+  let dir = path.dirname(realpathSync(found));
+
+  // Walk up to the runtime root rather than assuming a fixed depth: POSIX puts
+  // the interpreter in <root>/bin/python3 but Windows puts it at
+  // <root>\python.exe, so a fixed number of dirname() calls is right on one
+  // platform and overshoots on the other.
+  for (let up = 0; up < 3; up++) {
+    const hasStdlib = existsSync(path.join(dir, "lib")) || existsSync(path.join(dir, "Lib"));
+    const hasExe =
+      existsSync(path.join(dir, "python.exe")) || existsSync(path.join(dir, "bin"));
+    if (hasStdlib && hasExe) return dir;
+    dir = path.dirname(dir);
   }
-  return root;
+  throw new Error(
+    `could not locate a standalone runtime root above ${realpathSync(found)}`,
+  );
 }
 
 /**
