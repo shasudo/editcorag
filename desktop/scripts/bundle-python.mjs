@@ -217,19 +217,30 @@ function main() {
     "print('OUTSIDE:' + repr(outside))",
     "print('SERVER:' + server.__file__)",
   ].join("; ");
+  // Split on either line ending and trim each line: Windows emits \r\n, which
+  // left a trailing \r on every value and made exact comparisons below fail
+  // against a bundle that was in fact correct.
   const out = execFileSync(python, ["-c", probe], {
     env: { ...process.env, PYTHONHOME: PY_DIR },
     encoding: "utf8",
-  }).trim().split("\n");
+  })
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
 
   const [prefix, outside, serverPath] = out;
-  if (!prefix.startsWith(PY_DIR)) {
+  // Windows paths are case-insensitive and use backslashes; compare on a
+  // normalised form so these checks mean the same thing on both platforms.
+  const key = (p) => p.replace(/\\/g, "/").toLowerCase();
+  const root = key(PY_DIR);
+
+  if (!key(prefix).startsWith(root)) {
     throw new Error(`bundle resolved its prefix outside itself: ${prefix}`);
   }
-  if (outside !== "OUTSIDE:[]") {
+  if (outside.replace(/\s/g, "") !== "OUTSIDE:[]") {
     throw new Error(`bundle imports from outside itself: ${outside}`);
   }
-  if (!serverPath.includes(PY_DIR)) {
+  if (!key(serverPath).includes(root)) {
     throw new Error(`server package came from outside the bundle: ${serverPath}`);
   }
   console.log("  ok — prefix, sys.path and every heavy import stay inside the bundle");
