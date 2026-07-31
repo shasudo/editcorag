@@ -5,6 +5,14 @@ const path = require("node:path");
 const http = require("node:http");
 const { Backend } = require("./backend");
 
+// A double-clicked app has no stdout or stderr consumer, so every write fails
+// with EPIPE. Node reports that asynchronously as an 'error' event on the
+// stream, and with no listener it becomes an uncaught exception - which
+// Electron shows the user as a crash dialog before anything has gone wrong.
+for (const stream of [process.stdout, process.stderr]) {
+  stream.on("error", () => {});
+}
+
 let backend;
 let setupWindow = null;
 let mainWindow = null;
@@ -111,9 +119,16 @@ if (!app.requestSingleInstanceLock()) {
   app.whenReady().then(() => {
     backend = new Backend({
       dataDir: app.getPath("userData"),
-      // Mirrored to the terminal so `npm start` shows engine output, and so a
-      // packaged run leaves something in the system log to diagnose from.
-      onLog: (line) => console.log("[engine]", line),
+      // Mirrored to the terminal so `npm start` shows engine output. A
+      // double-clicked app has no stdout consumer at all, so the write is
+      // best-effort - see the EPIPE guard below.
+      onLog: (line) => {
+        try {
+          console.log("[engine]", line);
+        } catch {
+          /* nothing is reading stdout */
+        }
+      },
     });
     if (isMac) Menu.setApplicationMenu(Menu.buildFromTemplate([{ role: "appMenu" }, { role: "editMenu" }, { role: "windowMenu" }]));
     else Menu.setApplicationMenu(null);
