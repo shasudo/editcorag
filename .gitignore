@@ -1,0 +1,22 @@
+.venv/
+__pycache__/
+*.py[cod]
+.env
+.env.*
+!.env.example
+.pytest_cache/
+.ruff_cache/
+
+# Runtime state: PDFs, vector index, sqlite, figure crops, logs.
+data/
+
+# Frontend
+web/node_modules/
+web/dist/
+
+.DS_Store
+
+# Desktop bundle: a copied Python runtime, rebuilt by `npm run bundle`.
+desktop/node_modules/
+desktop/resources/
+desktop/release/

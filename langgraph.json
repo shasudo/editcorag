@@ -1,0 +1,8 @@
+{
+  "dependencies": ["."],
+  "graphs": {
+    "query": "./server/graphs/query_graph.py:studio_graph",
+    "ingest": "./server/graphs/ingest_graph.py:studio_graph"
+  },
+  "env": ".env"
+}

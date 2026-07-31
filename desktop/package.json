@@ -1,0 +1,75 @@
+{
+  "name": "editcorag-desktop",
+  "productName": "EditcoRAG",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Ask questions about your PDFs, entirely on your own machine.",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "bundle": "node scripts/bundle-python.mjs",
+    "dist:mac": "npm run bundle && electron-builder --mac",
+    "dist:win": "npm run bundle && electron-builder --win"
+  },
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  },
+  "allowScripts": {
+    "electron@33.4.11": true
+  },
+  "build": {
+    "appId": "com.editcorag.desktop",
+    "productName": "EditcoRAG",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "resources/python",
+        "to": "python"
+      },
+      {
+        "from": "resources/app",
+        "to": "app"
+      }
+    ],
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64"
+          ]
+        }
+      ],
+      "category": "public.app-category.productivity",
+      "identity": null,
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "signAndEditExecutable": true
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true
+    },
+    "afterPack": "scripts/adhoc-sign.js"
+  }
+}

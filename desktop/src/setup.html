@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:" />
+    <title>EditcoRAG</title>
+    <style>
+      :root {
+        --bg: #f7f8fa; --surface: #fff; --line: #dfe4ea;
+        --text: #10151c; --text-2: #4a5464; --text-3: #79839a;
+        --accent: #3b6cf6; --accent-fg: #fff; --warn: #b26a00; --danger: #c8342b;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #0b0e14; --surface: #121722; --line: #232c3d;
+          --text: #e8ecf4; --text-2: #a3adbf; --text-3: #6b7688;
+          --accent: #5b8dff; --accent-fg: #0b0e14; --warn: #f0b429; --danger: #ff6b60;
+        }
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0; height: 100vh; display: flex; flex-direction: column;
+        align-items: center; justify-content: center; gap: 18px; padding: 36px;
+        background: var(--bg); color: var(--text); text-align: center;
+        font-family: ui-sans-serif, -apple-system, "Segoe UI", system-ui, sans-serif;
+        -webkit-font-smoothing: antialiased; user-select: none;
+      }
+      h1 { margin: 0; font-size: 19px; font-weight: 600; letter-spacing: -0.01em; }
+      p { margin: 0; font-size: 13.5px; line-height: 1.55; color: var(--text-2); max-width: 46ch; }
+      .muted { color: var(--text-3); font-size: 12px; }
+      .spinner {
+        width: 30px; height: 30px; border-radius: 50%;
+        border: 2.5px solid var(--line); border-top-color: var(--accent);
+        animation: spin 0.8s linear infinite;
+      }
+      @keyframes spin { to { transform: rotate(360deg); } }
+      .bar { width: 340px; height: 6px; border-radius: 999px; background: var(--line); overflow: hidden; }
+      .bar > div { height: 100%; width: 0%; background: var(--accent); border-radius: 999px; transition: width .4s ease; }
+      .row { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+      button {
+        font: inherit; font-size: 13px; padding: 8px 16px; border-radius: 8px;
+        border: 1px solid var(--line); background: var(--surface); color: var(--text);
+        cursor: pointer;
+      }
+      button.primary { background: var(--accent); color: var(--accent-fg); border-color: transparent; }
+      button:hover { filter: brightness(1.08); }
+      code {
+        display: inline-block; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 12.5px; background: var(--surface); border: 1px solid var(--line);
+        padding: 7px 11px; border-radius: 7px; user-select: all; color: var(--text);
+      }
+      pre {
+        max-width: 100%; max-height: 150px; overflow: auto; text-align: left;
+        font-size: 11px; line-height: 1.45; background: var(--surface);
+        border: 1px solid var(--line); border-radius: 8px; padding: 10px;
+        color: var(--text-3); user-select: text; white-space: pre-wrap;
+      }
+      input {
+        width: 340px; font: inherit; font-size: 13px; padding: 9px 12px;
+        border-radius: 8px; border: 1px solid var(--line);
+        background: var(--surface); color: var(--text); text-align: center;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        user-select: text;
+      }
+      input:focus { outline: none; border-color: var(--accent); }
+      .hidden { display: none !important; }
+    </style>
+  </head>
+  <body>
+    <img id="logo" alt="" width="64" height="64"
+         style="border-radius:14px;margin-bottom:2px"
+         src="data:image/png;base64,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" />
+    <div id="spinner" class="spinner"></div>
+    <h1 id="title">Starting EditcoRAG</h1>
+    <p id="detail">Getting things ready…</p>
+
+    <div id="progress" class="hidden">
+      <div class="bar"><div id="fill"></div></div>
+      <p class="muted" id="pct" style="margin-top:9px">0%</p>
+    </div>
+
+    <div id="hint" class="hidden">
+      <p class="muted">This happens once. You can leave it running.</p>
+    </div>
+
+    <div id="keyrow" class="hidden">
+      <input id="key" type="password" spellcheck="false" autocomplete="off"
+             placeholder="gsk_…" aria-label="Groq API key" />
+    </div>
+
+    <div id="actions" class="row hidden"></div>
+    <pre id="logs" class="hidden"></pre>
+
+    <script>
+      const $ = (id) => document.getElementById(id);
+      const show = (el, on) => el.classList.toggle("hidden", !on);
+
+      function setActions(buttons) {
+        const box = $("actions");
+        box.innerHTML = "";
+        buttons.forEach(({ label, primary, onClick }) => {
+          const b = document.createElement("button");
+          b.textContent = label;
+          if (primary) b.className = "primary";
+          b.onclick = onClick;
+          box.appendChild(b);
+        });
+        show(box, buttons.length > 0);
+      }
+
+      const LLM_HELP = {
+        no_key: {
+          title: "One quick step",
+          body: "EditcoRAG writes answers using Groq. Paste a Groq API key below — it’s free to create and is stored only on this computer.",
+          needsKey: true,
+        },
+        bad_key: {
+          title: "That key wasn’t accepted",
+          body: "Groq rejected the key. Check it was copied in full, then try again.",
+          needsKey: true,
+        },
+        offline: {
+          title: "No connection to Groq",
+          body: "EditcoRAG couldn’t reach Groq. Check this computer’s internet connection, then choose Try again.",
+          needsKey: false,
+        },
+        model_missing: {
+          title: "That model isn’t available",
+          body: "Groq doesn’t currently serve the configured model. You can continue — answering will not work until it is changed.",
+          needsKey: false,
+        },
+        unknown: {
+          title: "Couldn’t check the answering model",
+          body: "EditcoRAG could not verify Groq. You can continue and try asking a question.",
+          needsKey: false,
+        },
+      };
+
+      window.shellApi.onStatus((s) => {
+        show($("progress"), s.phase === "downloading");
+        show($("hint"), s.phase === "downloading");
+        show($("spinner"), s.phase === "starting" || s.phase === "downloading");
+        show($("logs"), false);
+        show($("keyrow"), false);
+        setActions([]);
+
+        if (s.phase === "starting") {
+          $("title").textContent = "Starting EditcoRAG";
+          $("detail").textContent = s.detail || "";
+        } else if (s.phase === "downloading") {
+          $("title").textContent = "Setting up";
+          $("detail").textContent = s.detail || "Downloading language models";
+          $("fill").style.width = (s.percent || 0) + "%";
+          $("pct").textContent = Math.round(s.percent || 0) + "%";
+        } else if (s.phase === "llm") {
+          const help = LLM_HELP[s.llm?.status] || LLM_HELP.unknown;
+          $("title").textContent = help.title;
+          $("detail").textContent = help.body;
+          show($("keyrow"), help.needsKey);
+
+          if (help.needsKey) {
+            const field = $("key");
+            const submit = async () => {
+              const value = field.value.trim();
+              if (!value) return;
+              $("detail").textContent = "Checking the key…";
+              setActions([]);
+              await window.shellApi.submitKey(value);
+            };
+            field.onkeydown = (e) => {
+              if (e.key === "Enter") submit();
+            };
+            setTimeout(() => field.focus(), 50);
+            setActions([
+              { label: "Continue", primary: true, onClick: submit },
+              { label: "Get a free key", onClick: () =>
+                  window.shellApi.openExternal("https://console.groq.com/keys") },
+            ]);
+          } else {
+            setActions([
+              { label: "Try again", primary: true, onClick: async (e) => {
+                  e.target.textContent = "Checking…";
+                  e.target.disabled = true;
+                  await window.shellApi.retryLlm();
+                } },
+              { label: "Continue anyway", onClick: () => window.shellApi.continueAnyway() },
+            ]);
+          }
+        } else if (s.phase === "error") {
+          $("title").textContent = "EditcoRAG couldn’t start";
+          $("detail").textContent = s.detail || "Something went wrong.";
+          setActions([
+            { label: "Show details", onClick: async () => {
+                $("logs").textContent = await window.shellApi.getLogs();
+                show($("logs"), true);
+              } },
+          ]);
+        }
+      });
+    </script>
+  </body>
+</html>
