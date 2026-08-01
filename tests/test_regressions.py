@@ -542,3 +542,20 @@ class TestCitationParsing:
         cleaned, cites = _validate_citations("Claim 【S1】 and invented 【S9】.", used)
         assert [c["ref"] for c in cites] == ["S1"]
         assert "S9" not in cleaned
+
+
+class TestHealthDoesNotBlockTheLoop:
+    """The desktop shell polls /api/health to decide the engine is up.
+
+    Every part of that handler blocks - lancedb's import, llm_status' httpx
+    call, the snapshot scans. Declared `async def` it froze uvicorn's event
+    loop, the shell's probes timed out, and a perfectly healthy engine was
+    reported as "started but never became reachable".
+    """
+
+    def test_handler_is_sync_so_fastapi_threads_it(self) -> None:
+        import inspect
+
+        from server.api import health
+
+        assert not inspect.iscoroutinefunction(health)

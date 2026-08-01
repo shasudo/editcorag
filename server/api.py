@@ -98,7 +98,7 @@ def _doc_row(row: Any) -> dict[str, Any]:
 
 
 @app.get("/api/health")
-async def health() -> dict[str, Any]:
+def health() -> dict[str, Any]:
     """Liveness, store sizes, and whether the app can actually answer yet.
 
     This is what the desktop shell polls to decide between the setup screen and
@@ -106,6 +106,12 @@ async def health() -> dict[str, Any]:
     failure becomes a field, not a 500. It previously returned ok:true without
     consulting the LLM at all, so the UI claimed to be ready while nothing
     could answer.
+
+    Sync on purpose, so FastAPI runs it in a worker thread. Every part of it
+    blocks - importing lancedb, the httpx call in llm_status, the snapshot
+    scans - and as an async endpoint it froze the loop for seconds at a time,
+    which meant the shell's own start-up probes timed out against a server that
+    was running perfectly well.
     """
     from . import setup as provisioning
     from .index.store import ChunkStore
