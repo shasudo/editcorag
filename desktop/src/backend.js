@@ -169,11 +169,15 @@ class Backend {
   }
 
   /** Poll until the API answers, so the window only opens on something live. */
-  async waitForHealth({ attempts = 120, delayMs = 500 } = {}) {
-    for (let i = 0; i < attempts; i++) {
+  async waitForHealth({ budgetMs = 90_000, delayMs = 500 } = {}) {
+    const deadline = Date.now() + budgetMs;
+    while (Date.now() < deadline) {
       if (this.exited) throw new Error("The engine stopped while starting up.");
       try {
-        const res = await get(`${this.origin}/api/health`);
+        // Generous per-request timeout: the first health call is the one that
+        // imports lancedb and asks Groq which models it serves, and a slow
+        // answer is not the same thing as a dead server.
+        const res = await get(`${this.origin}/api/health`, 15_000);
         if (res.status === 200) return res.json;
       } catch {
         /* not listening yet */
